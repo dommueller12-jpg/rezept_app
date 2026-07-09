@@ -5,13 +5,30 @@ import re
 
 st.set_page_config(page_title="Team Rezept-Manager", page_icon="🍳", layout="centered")
 
-# INITIALISIERUNG DER DATENBANK (Damit Rezepte im Hintergrund gespeichert bleiben)
+# 1. DEINE NEUEN KATEGORIEN (Sinnvoll sortiert)
+KATEGORIEN = [
+    "Vorspeisen", 
+    "Suppen",
+    "Fleisch", 
+    "Vegi", 
+    "Vegan", 
+    "Saucen", 
+    "Marinaden",
+    "Teige", 
+    "Garnituren",
+    "Dessert", 
+    "Dessert gefroren"
+]
+
+# INITIALISIERUNG DER DATENBANK MIT DEN NEUEN KATEGORIEN
 if 'datenbank' not in st.session_state:
     st.session_state.datenbank = [
-        {"titel": "Klassische Lasagne", "kategorie": "Hauptspeisen", "zutaten": "12 Lasagneblätter\n500g Hackfleisch\n2 Zwiebeln\n400g Tomaten (Dose)\n200g Parmesan"},
-        {"titel": "Schokomuffins", "kategorie": "Desserts", "zutaten": "250g Mehl\n100g Zucker\n50g Kakaopulver\n2 Eier\n100ml Milch"},
-        {"titel": "Tomatensuppe", "kategorie": "Vorspeisen", "zutaten": "1kg Tomaten\n1 Zwiebel\n2 Knoblauchzehen\n500ml Gemüsebrühe"}
+        {"id": 0, "titel": "Tomaten-Carpaccio", "kategorie": "Vorspeisen", "zutaten": "4 grosse Tomaten\n50ml Olivenöl\n20g Basilikum\nSalz & Pfeffer"},
+        {"id": 1, "titel": "Rindsfilet Marinade", "kategorie": "Marinaden", "zutaten": "100ml Olivenöl\n2 Zweige Rosmarin\n2 Knoblauchzehen\n1 TL Senf"},
+        {"id": 2, "titel": "Zitronen-Sorbet", "kategorie": "Dessert gefroren", "zutaten": "200ml Zitronensaft\n150g Zucker\n200ml Wasser"}
     ]
+if 'id_counter' not in st.session_state:
+    st.session_state.id_counter = 3
 
 # Hilfsfunktion zur Multiplikation von Zahlen im Text
 def multipliziere_zutaten(text, faktor):
@@ -35,13 +52,13 @@ try:
     api_key = st.secrets["OPENAI_API_KEY"]
     client = OpenAI(api_key=api_key)
 
-    # 📱 KAPITEL-NAVIGATION (Für Smartphones optimierte Tabs ganz oben)
+    # 📱 KAPITEL-NAVIGATION TABS
     kapitel = st.tabs(["📸 Zettel scannen", "🗂️ Rezept-Datenbank", "✍️ Neu hinzufügen"])
 
     # ------------------------------------------------------------
     # KAPITEL 1: ZETTEL SCANNEN
     # ------------------------------------------------------------
-    with kapitel[0]:
+    with kapitel:
         st.subheader("📸 Handschriftliches Rezept digitalisieren")
         uploaded_file = st.file_uploader("Foto hochladen", type=["jpg", "jpeg", "png"], key="scanner_upload")
 
@@ -84,14 +101,14 @@ try:
                 st.write(berechnetes_rezept)
 
     # ------------------------------------------------------------
-    # KAPITEL 2: REZEPT-DATENBANK
+    # KAPITEL 2: REZEPT-DATENBANK (Inklusive Bearbeiten & Löschen)
     # ------------------------------------------------------------
-    with kapitel[1]:
+    with kapitel:
         st.subheader("🗂️ Geteilte Rezept-Datenbank")
         
-        # Filter nach Kategorien
-        kategorien = ["Alle", "Vorspeisen", "Hauptspeisen", "Desserts"]
-        auswahl_kat = st.selectbox("Kategorie filtern:", kategorien)
+        # Filter nach den neuen Kategorien
+        such_kategorien = ["Alle"] + KATEGORIEN
+        auswahl_kat = st.selectbox("Kategorie filtern:", such_kategorien)
         
         # Rezepte filtern
         if auswahl_kat == "Alle":
@@ -103,34 +120,85 @@ try:
         if not gefilterte_rezepte:
             st.info("Noch keine Rezepte in dieser Kategorie vorhanden.")
         else:
-            for r in gefilterte_rezepte:
-                with st.expander(f"🍽️ {r['titel']}"):
-                    st.caption(f"Kategorie: {r['kategorie']}")
-                    st.markdown("**Basis-Zutaten:**")
-                    st.text(r['zutaten'])
+            # Wir gehen die Rezepte durch
+            for idx, r in enumerate(gefilterte_rezepte):
+                with st.expander(f"🍽️ {r['titel']} ({r['kategorie']})"):
                     
-                    # Auch in der Datenbank lässt sich die Menge multiplizieren!
-                    db_faktor = st.slider(f"Portionen für {r['titel']}:", min_value=1, max_value=10, value=1, key=f"slider_{r['titel']}")
-                    if db_faktor > 1:
-                        st.markdown("**🔢 Umgerechnete Zutaten:**")
-                        st.write(multipliziere_zutaten(r['zutaten'], db_faktor))
+                    # Einzigartiger Schlüssel für den Bearbeitungsmodus dieses Rezepts
+                    edit_key = f"edit_mode_{r['id']}"
+                    if edit_key not in st.session_state:
+                        st.session_state[edit_key] = False
+
+                    # MODUS A: REZEPT ANZEIGEN & MULTIPLIZIEREN
+                    if not st.session_state[edit_key]:
+                        st.markdown("**Basis-Zutaten:**")
+                        st.text(r['zutaten'])
+                        
+                        db_faktor = st.slider(f"Portionen für {r['titel']}:", min_value=1, max_value=10, value=1, key=f"slider_{r['id']}")
+                        if db_faktor > 1:
+                            st.markdown("**🔢 Umgerechnete Zutaten:**")
+                            st.write(multipliziere_zutaten(r['zutaten'], db_faktor))
+                        
+                        st.divider()
+                        
+                        # Buttons für Bearbeiten und Löschen nebeneinander
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            if st.button("✏️ Bearbeiten", key=f"btn_edit_{r['id']}"):
+                                st.session_state[edit_key] = True
+                                st.rerun()
+                        with col2:
+                            if st.button("🗑️ Löschen", key=f"btn_del_{r['id']}", type="secondary"):
+                                # Aus der Datenbank entfernen
+                                st.session_state.datenbank = [rezept for rezept in st.session_state.datenbank if rezept["id"] != r["id"]]
+                                st.success(f"'{r['titel']}' wurde gelöscht!")
+                                st.rerun()
+
+                    # MODUS B: REZEPT BEARBEITEN
+                    else:
+                        st.markdown("### ✏️ Rezept bearbeiten")
+                        edit_titel = st.text_input("Name:", value=r['titel'], key=f"tit_{r['id']}")
+                        edit_kat = st.selectbox("Kategorie:", KATEGORIEN, index=KATEGORIEN.index(r['kategorie']), key=f"kat_{r['id']}")
+                        edit_zutaten = st.text_area("Zutaten:", value=r['zutaten'], key=f"zut_{r['id']}")
+                        
+                        b1, b2 = st.columns(2)
+                        with b1:
+                            if st.button("💾 Speichern", key=f"save_{r['id']}", type="primary"):
+                                # Daten in der originalen Datenbank aktualisieren
+                                for original in st.session_state.datenbank:
+                                    if original["id"] == r["id"]:
+                                        original["titel"] = edit_titel
+                                        original["kategorie"] = edit_kat
+                                        original["zutaten"] = edit_zutaten
+                                st.session_state[edit_key] = False
+                                st.success("Änderungen gespeichert!")
+                                st.rerun()
+                        with b2:
+                            if st.button("❌ Abbrechen", key=f"canc_{r['id']}"):
+                                st.session_state[edit_key] = False
+                                st.rerun()
 
     # ------------------------------------------------------------
     # KAPITEL 3: REZEPT MANUELL HINZUFÜGEN
     # ------------------------------------------------------------
-    with kapitel[2]:
+    with kapitel:
         st.subheader("✍️ Neues Rezept manuell eintippen")
-        neuer_titel = st.text_input("Name des Rezepts:")
-        neue_kat = st.selectbox("Kategorie wählen:", ["Vorspeisen", "Hauptspeisen", "Desserts"])
-        neue_zutaten = st.text_area("Zutaten (Zeile für Zeile, z.B. '200g Mehl'):")
+        neuer_titel = st.text_input("Name des Rezepts:", key="add_titel")
+        neue_kat = st.selectbox("Kategorie wählen:", KATEGORIEN, key="add_kat")
+        neue_zutaten = st.text_area("Zutaten (Zeile für Zeile, z.B. '200g Mehl'):", key="add_zutaten")
         
-        if st.button("💾 In Datenbank speichern"):
+        if st.button("💾 In Datenbank speichern", key="add_save_btn"):
             if neuer_titel and neue_zutaten:
-                neues_rezept = {"titel": neuer_titel, "kategorie": neue_kat, "zutaten": neue_zutaten}
+                neues_rezept = {
+                    "id": st.session_state.id_counter, 
+                    "titel": neuer_titel, 
+                    "kategorie": neue_kat, 
+                    "zutaten": neue_zutaten
+                }
                 st.session_state.datenbank.append(neues_rezept)
-                st.success(f"'{neuer_titel}' wurde erfolgreich in die Datenbank gespeichert!")
+                st.session_state.id_counter += 1
+                st.success(f"'{neuer_titel}' wurde erfolgreich unter '{neue_kat}' gespeichert!")
             else:
                 st.error("Bitte fülle den Namen und die Zutatenliste aus.")
 
 except Exception as e:
-    st.error("Der OpenAI API Key fehlt in den Cloud-Settings! Bitte hinterlege ihn unter 'Manage app' -> 'Settings' -> 'Secrets'.")
