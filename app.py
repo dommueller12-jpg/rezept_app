@@ -58,7 +58,7 @@ try:
     # ------------------------------------------------------------
     # KAPITEL 1: ZETTEL SCANNEN
     # ------------------------------------------------------------
-    with kapitel:
+    with kapitel[0]:
         st.subheader("📸 Handschriftliches Rezept digitalisieren")
         uploaded_file = st.file_uploader("Foto hochladen", type=["jpg", "jpeg", "png"], key="scanner_upload")
 
@@ -103,7 +103,7 @@ try:
     # ------------------------------------------------------------
     # KAPITEL 2: REZEPT-DATENBANK (Inklusive Bearbeiten & Löschen)
     # ------------------------------------------------------------
-    with kapitel:
+    with kapitel[1]:
         st.subheader("🗂️ Geteilte Rezept-Datenbank")
         
         # Filter nach den neuen Kategorien
@@ -120,11 +120,9 @@ try:
         if not gefilterte_rezepte:
             st.info("Noch keine Rezepte in dieser Kategorie vorhanden.")
         else:
-            # Wir gehen die Rezepte durch
             for idx, r in enumerate(gefilterte_rezepte):
                 with st.expander(f"🍽️ {r['titel']} ({r['kategorie']})"):
                     
-                    # Einzigartiger Schlüssel für den Bearbeitungsmodus dieses Rezepts
                     edit_key = f"edit_mode_{r['id']}"
                     if edit_key not in st.session_state:
                         st.session_state[edit_key] = False
@@ -141,7 +139,6 @@ try:
                         
                         st.divider()
                         
-                        # Buttons für Bearbeiten und Löschen nebeneinander
                         col1, col2 = st.columns(2)
                         with col1:
                             if st.button("✏️ Bearbeiten", key=f"btn_edit_{r['id']}"):
@@ -149,7 +146,6 @@ try:
                                 st.rerun()
                         with col2:
                             if st.button("🗑️ Löschen", key=f"btn_del_{r['id']}", type="secondary"):
-                                # Aus der Datenbank entfernen
                                 st.session_state.datenbank = [rezept for rezept in st.session_state.datenbank if rezept["id"] != r["id"]]
                                 st.success(f"'{r['titel']}' wurde gelöscht!")
                                 st.rerun()
@@ -164,7 +160,6 @@ try:
                         b1, b2 = st.columns(2)
                         with b1:
                             if st.button("💾 Speichern", key=f"save_{r['id']}", type="primary"):
-                                # Daten in der originalen Datenbank aktualisieren
                                 for original in st.session_state.datenbank:
                                     if original["id"] == r["id"]:
                                         original["titel"] = edit_titel
@@ -181,13 +176,13 @@ try:
     # ------------------------------------------------------------
     # KAPITEL 3: REZEPT MANUELL HINZUFÜGEN
     # ------------------------------------------------------------
-    with kapitel:
+    with kapitel[2]:
         st.subheader("✍️ Neues Rezept manuell eintippen")
         neuer_titel = st.text_input("Name des Rezepts:", key="add_titel")
         neue_kat = st.selectbox("Kategorie wählen:", KATEGORIEN, key="add_kat")
         neue_zutaten = st.text_area("Zutaten (Zeile für Zeile, z.B. '200g Mehl'):", key="add_zutaten")
         
-        if st.button("💾 In Datenbank speichern", key="add_save_btn"):
+        if st.button("💾 In Datenbank保存 speichern", key="add_save_btn"):
             if neuer_titel and neue_zutaten:
                 neues_rezept = {
                     "id": st.session_state.id_counter, 
@@ -202,3 +197,4 @@ try:
                 st.error("Bitte fülle den Namen und die Zutatenliste aus.")
 
 except Exception as e:
+    st.error("Der OpenAI API Key fehlt in den Cloud-Settings! Bitte hinterlege ihn unter 'Manage app' -> 'Settings' -> 'Secrets'.")
